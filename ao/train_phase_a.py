@@ -12,8 +12,8 @@ from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
-from .data_wiki import stream_wikipedia, PackedWiki, collate_phase_a
-from .runtime import ActivationOracleRuntime
+from ao.data_wiki import stream_wikipedia, PackedWiki, collate_phase_a
+from ao.runtime import ActivationOracleRuntime
 
 
 def ensure_single_token_placeholder(tok, candidate: str = "?"):
