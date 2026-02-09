@@ -10,8 +10,8 @@ from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
-from ao.data_ambik import ensure_ambik, load_ambik_test900, build_train_dev_examples
-from ao.runtime import ActivationOracleRuntime
+from .data_ambik import ensure_ambik, load_ambik_test900, build_train_dev_examples
+from .runtime import ActivationOracleRuntime
 
 
 def ensure_single_token_placeholder(tok, candidate: str = "?"):
