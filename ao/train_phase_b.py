@@ -95,7 +95,7 @@ def main():
 
         S = target.numel()
         K = min(args.k_act, S)
-        act_pos = torch.arange(S-K, S, dtype=torch.long)
+        act_pos = torch.linspace(0, S-1, steps=K).round().long()
 
         label_ids = tokenizer(b["label_text"], add_special_tokens=False).input_ids + [tokenizer.eos_token_id]
         oracle_ids = torch.tensor(ao_prompt_ids + [placeholder_id]*K + label_ids, dtype=torch.long)

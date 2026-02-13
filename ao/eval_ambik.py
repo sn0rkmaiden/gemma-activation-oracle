@@ -91,7 +91,7 @@ def main():
 
         S = target.numel()
         K = min(args.k_act, S)
-        act_pos = torch.arange(S-K, S, dtype=torch.long)
+        act_pos = torch.linspace(0, S-1, steps=K).round().long()
 
         return {
             "target_text": b["target_text"],
