@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import argparse
 import random
 
@@ -12,7 +13,9 @@ from torch.optim import AdamW
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
-from .data_ambik import ensure_ambik, load_ambik_test900, build_train_dev_examples
+import pandas as pd
+import re
+from .data_ambik import build_train_dev_examples
 from .runtime import ActivationOracleRuntime
 
 
@@ -48,7 +51,9 @@ def main():
     ap.add_argument("--capture_layer", type=int, default=9)
     ap.add_argument("--inject_layer", type=int, default=1)
     ap.add_argument("--dev_size", type=float, default=0.2)
-    ap.add_argument("--neg_label", type=str, default="NO_QUESTION")
+    ap.add_argument("--neg_label", type=str, default="NO")
+    ap.add_argument("--ambik_csv", type=str, default="data/ambik_test_900.csv",
+                    help="Path to a local AmbiK CSV (e.g., data/ambik_test_900.csv).")
     args = ap.parse_args()
 
     random.seed(args.seed)
@@ -74,8 +79,13 @@ def main():
     model.train()
 
     # Build AmbiK examples
-    data_dir = ensure_ambik()
-    df = load_ambik_test900(data_dir)
+    if not os.path.exists(args.ambik_csv):
+        raise FileNotFoundError(
+            f"AmbiK CSV not found at {args.ambik_csv}. Download it and place it there, or pass --ambik_csv."
+        )
+    df = pd.read_csv(args.ambik_csv)
+    # normalize column names to match AmbiK variants
+    df.columns = [re.sub(r"[^a-z0-9]+", "_", c.strip().lower()) for c in df.columns]
     train_ex, dev_ex = build_train_dev_examples(df, seed=args.seed, dev_size=args.dev_size, neg_label=args.neg_label)
 
     AO_TASK_PROMPT = (
@@ -97,7 +107,14 @@ def main():
         K = min(args.k_act, S)
         act_pos = torch.linspace(0, S-1, steps=K).round().long()
 
-        label_ids = tokenizer(b["label_text"], add_special_tokens=False).input_ids + [tokenizer.eos_token_id]
+        label_text = str(b["label_text"]).strip()
+        if bool(b.get("is_amb", False)):
+            if not label_text.upper().startswith("YES"):
+                label_text = "YES: " + label_text
+        else:
+            label_text = args.neg_label
+
+        label_ids = tokenizer(label_text, add_special_tokens=False).input_ids + [tokenizer.eos_token_id]
         oracle_ids = torch.tensor(ao_prompt_ids + [placeholder_id]*K + label_ids, dtype=torch.long)
 
         labels = torch.full_like(oracle_ids, -100)

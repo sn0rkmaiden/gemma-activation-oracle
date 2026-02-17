@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import argparse
 import re
 
@@ -10,7 +11,9 @@ from tqdm.auto import tqdm
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
-from .data_ambik import ensure_ambik, load_ambik_test900, build_train_dev_examples
+import pandas as pd
+import re as _re
+from .data_ambik import build_train_dev_examples
 from .runtime import ActivationOracleRuntime
 
 
@@ -49,7 +52,9 @@ def main():
     ap.add_argument("--capture_layer", type=int, default=9)
     ap.add_argument("--inject_layer", type=int, default=1)
     ap.add_argument("--dev_size", type=float, default=0.2)
-    ap.add_argument("--neg_label", type=str, default="NO_QUESTION")
+    ap.add_argument("--neg_label", type=str, default="NO")
+    ap.add_argument("--ambik_csv", type=str, default="data/ambik_test_900.csv",
+                    help="Path to a local AmbiK CSV (e.g., data/ambik_test_900.csv).")
     args = ap.parse_args()
 
     tokenizer = AutoTokenizer.from_pretrained(args.adapter_dir, use_fast=True)
@@ -70,8 +75,12 @@ def main():
     model = PeftModel.from_pretrained(base, args.adapter_dir)
     model.eval()
 
-    data_dir = ensure_ambik()
-    df = load_ambik_test900(data_dir)
+    if not os.path.exists(args.ambik_csv):
+        raise FileNotFoundError(
+            f"AmbiK CSV not found at {args.ambik_csv}. Download it and place it there, or pass --ambik_csv."
+        )
+    df = pd.read_csv(args.ambik_csv)
+    df.columns = [_re.sub(r"[^a-z0-9]+", "_", c.strip().lower()) for c in df.columns]
     _, dev_ex = build_train_dev_examples(df, seed=args.seed, dev_size=args.dev_size, neg_label=args.neg_label)
 
     AO_TASK_PROMPT = (
@@ -141,7 +150,7 @@ def main():
             do_sample=False
         )
         pred = normalize(pred)
-        pred_is_amb = (pred != args.neg_label)
+        pred_is_amb = pred.upper().startswith("YES")
         gold_is_amb = bool(b["is_amb"])
 
         if pred_is_amb and gold_is_amb: tp += 1
