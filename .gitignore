@@ -6,7 +6,6 @@ __pycache__/
 .env
 wandb/
 runs/
-data/
 outputs/
 *.pt
 *.bin
